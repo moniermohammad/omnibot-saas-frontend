@@ -342,7 +342,7 @@ export default function WaDevicePage() {
           onDisconnect={handleDisconnect}
         /> */}
 
-        <WaConnectionStatus tenantId={tenantId} />
+        {/* <WaConnectionStatus tenantId={tenantId} /> */}
 
         {/* MODUL T1-08: KARTU DISCLAIMER & PANDUAN KEAMANAN NOMOR WHATSAPP */}
         <div className="mb-6 bg-amber-500/10 border border-amber-500/25 rounded-2xl p-5 shadow-xl text-left">
