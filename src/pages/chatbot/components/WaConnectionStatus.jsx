@@ -4,7 +4,9 @@ import { chatbotService } from '../../../api/chatbotService';
 import WaStatusCard from './WaStatusCard';
 import WaQrModal from './WaQrModal';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
+
 
 export default function WaConnectionStatus({ tenantId }) {
   const [status, setStatus] = useState('CHECKING');

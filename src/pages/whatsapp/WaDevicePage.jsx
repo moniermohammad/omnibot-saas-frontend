@@ -8,7 +8,9 @@ import LegalModal from './components/LegalModal';
 import WaConnectionStatus from '../chatbot/components/WaConnectionStatus';
 // import WaConnectionStatus from './components/WaConnectionStatus';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
+
 const MAX_INIT_RETRIES = 8;
 
 function getStoredUser() {
