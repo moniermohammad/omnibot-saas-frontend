@@ -52,7 +52,7 @@ export const chatbotService = {
 
   // Create pengatuiran dan update datanya 
   createConfigChatbots: async (configData) => {
-    console.log(configData);
+    // console.log(configData);
     try {
       const response = await axiosInstance.post('/api/bot/editor/save-config', configData);
       return response.data;

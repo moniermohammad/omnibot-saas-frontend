@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-console.log("Jalur Base URL Axios yang Aktif:", import.meta.env.VITE_API_BASE_URL);
+// console.log("Jalur Base URL Axios yang Aktif:", import.meta.env.VITE_API_BASE_URL);
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -18,10 +18,10 @@ axiosInstance.interceptors.request.use(
     if (savedUser) {
       try {
         const userObj = JSON.parse(savedUser);
-         console.log(userObj);
+        //  console.log(userObj);
         const tokenString = userObj?.token || userObj?.accessToken;
 
-        console.log(tokenString);
+        // console.log(tokenString);
 
         if (tokenString) {
           config.headers.Authorization = `Bearer ${tokenString}`;

@@ -32,6 +32,8 @@ export default function WaDevicePage() {
 
   // State khusus WaQrModal
   const [isOpenModal, setIsOpenModal] = useState(false);
+  const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false);
+
   const [qrData, setQrData] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState(null);
@@ -184,15 +186,49 @@ export default function WaDevicePage() {
   }, [countdown]);
 
   // 4. Polling cepat saat modal terbuka (cadangan jika socket terlambat)
-  useEffect(() => {
-    if (!isOpenModal || qrError || countdown <= 0) return;
+  // useEffect(() => {
+  //   if (!isOpenModal || qrError || countdown <= 0) return;
 
-    const fastInterval = setInterval(() => {
-      checkDeviceStatus(true);
-    }, 2500);
+  //   const fastInterval = setInterval(() => {
+  //     checkDeviceStatus(true);
+  //   }, 2500);
+
+  //   return () => clearInterval(fastInterval);
+  // }, [isOpenModal, qrError, countdown, checkDeviceStatus]);
+  // 4. Polling cepat setiap 3 detik saat modal terbuka (samakan dengan MasterBotCard)
+  useEffect(() => {
+    if (!isOpenModal) return;
+
+    const fastInterval = setInterval(async () => {
+      try {
+        const res = await chatbotService.getQrCodeBot();
+        const data = res?.data ? res.data : res;
+
+        if (!isMountedRef.current) return;
+
+        if (data?.success && data.status === 'ONLINE') {
+          clearInterval(fastInterval);
+          initRetryCountRef.current = 0;
+          setWaStatus('ONLINE');
+          setPhoneNumber(data.phoneNumber || data.botNumber || '');
+          setIsOpenModal(false);
+          setQrData(null);
+          setCountdown(0);
+          setQrLoading(false);
+          setQrError(null);
+        } else if (data?.success && (data.qrCodeString || data.qr || data.qrCode)) {
+          setQrData({
+            ...data,
+            qrCodeString: data.qrCodeString || data.qr || data.qrCode,
+          });
+        }
+      } catch (err) {
+        // Abaikan error sementara saat pairing
+      }
+    }, 3000);
 
     return () => clearInterval(fastInterval);
-  }, [isOpenModal, qrError, countdown, checkDeviceStatus]);
+  }, [isOpenModal]);
 
   // 5. Buka Modal & Minta QR Code baru dari server
   const handleFetchQr = useCallback(
@@ -278,41 +314,78 @@ export default function WaDevicePage() {
     setQrLoading(false);
   };
 
-  // 6. Putuskan sesi perangkat WhatsApp
-  const handleDisconnect = async () => {
-    if (
-      !window.confirm(
-        'Apakah Anda yakin ingin memutuskan koneksi bot WhatsApp ini?'
-      )
-    ) {
-      return;
-    }
-
+    // Membuka custom modal konfirmasi
+  const handleDisconnect = () => {
     if (!tenantId) {
-      alert('Tenant ID tidak ditemukan.');
+      setQrError('Tenant ID tidak ditemukan.');
       return;
     }
+    setIsDisconnectModalOpen(true);
+  };
 
+  // Eksekusi putuskan koneksi saat user klik "Ya, Putuskan Koneksi" di dalam modal
+  const confirmDisconnect = async () => {
     try {
       setDisconnectLoading(true);
+      setQrError(null);
+
       const res = await chatbotService.disConectedBot(tenantId);
       const data = res?.data ? res.data : res;
 
       if (data?.success) {
+        setIsDisconnectModalOpen(false);
         setWaStatus('OFFLINE');
         setPhoneNumber('');
         setQrData(null);
         setCountdown(0);
-        alert('Bot berhasil diputus koneksinya.');
       } else {
-        alert(data?.message || 'Gagal memutuskan koneksi bot.');
+        setIsDisconnectModalOpen(false);
+        setQrError(data?.message || 'Gagal memutuskan koneksi bot.');
       }
     } catch (err) {
-      alert(err?.message || 'Terjadi kesalahan.');
+      setIsDisconnectModalOpen(false);
+      setQrError(err?.message || 'Terjadi kesalahan saat memutuskan koneksi.');
     } finally {
       setDisconnectLoading(false);
     }
   };
+
+
+  // 6. Putuskan sesi perangkat WhatsApp
+  // const handleDisconnect = async () => {
+  //   if (
+  //     !window.confirm(
+  //       'Apakah Anda yakin ingin memutuskan koneksi bot WhatsApp ini?'
+  //     )
+  //   ) {
+  //     return;
+  //   }
+
+  //   if (!tenantId) {
+  //     alert('Tenant ID tidak ditemukan.');
+  //     return;
+  //   }
+
+  //   try {
+  //     setDisconnectLoading(true);
+  //     const res = await chatbotService.disConectedBot(tenantId);
+  //     const data = res?.data ? res.data : res;
+
+  //     if (data?.success) {
+  //       setWaStatus('OFFLINE');
+  //       setPhoneNumber('');
+  //       setQrData(null);
+  //       setCountdown(0);
+  //       alert('Bot berhasil diputus koneksinya.');
+  //     } else {
+  //       alert(data?.message || 'Gagal memutuskan koneksi bot.');
+  //     }
+  //   } catch (err) {
+  //     alert(err?.message || 'Terjadi kesalahan.');
+  //   } finally {
+  //     setDisconnectLoading(false);
+  //   }
+  // };
 
   const isOnline = waStatus === 'ONLINE';
 
@@ -471,6 +544,53 @@ export default function WaDevicePage() {
             </div>
           )}
         </div>
+                {/* CUSTOM MODAL KONFIRMASI PUTUSKAN KONEKSI */}
+        {isDisconnectModalOpen && (
+          <div
+            onClick={() => !disconnectLoading && setIsDisconnectModalOpen(false)}
+            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#0f172a] border border-white/15 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center relative"
+            >
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-2xl shadow-lg shadow-rose-500/10">
+                🔌
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-extrabold text-white m-0">
+                  Putuskan Koneksi WhatsApp?
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed m-0">
+                  Asisten Auto-Reply AI pada nomor{' '}
+                  <span className="text-slate-200 font-semibold">+{phoneNumber}</span>{' '}
+                  akan berhenti merespons pesan pelanggan hingga Anda menautkan ulang QR Code.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={disconnectLoading}
+                  onClick={() => setIsDisconnectModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={disconnectLoading}
+                  onClick={confirmDisconnect}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all cursor-pointer shadow-lg shadow-rose-600/25 disabled:opacity-50"
+                >
+                  {disconnectLoading ? '⏳ Memutuskan...' : 'Ya, Putuskan Koneksi'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* MODAL QR CODE */}
         <WaQrModal
