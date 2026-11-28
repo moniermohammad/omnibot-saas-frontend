@@ -17,20 +17,6 @@ export const userService = {
   },
 
   /**
-   * Mengambil daftar tim sales aktif dari database PostgreSQL untuk dropdown
-   */
-  getTenantSalesList: async () => {
-    try {
-      // 🌟 SINKRONISASI: Diubah dari /api/user menjadi /api/users agar pas dengan rute Express
-      const response = await axiosInstance.get('/api/users/sales/list');
-      return response.data;
-    } catch (error) {
-      console.error("🚨 Gagal memuat daftar tim sales:", error);
-      throw error.response?.data?.message || '❌ Gagal memuat daftar tim sales.';
-    }
-  }, // 🌟 PERBAIKAN: Ditambahkan tanda koma ( , ) wajib di sini sebagai pemisah antar fungsi objek
-
-  /**
    * Mengirim permintaan hapus agen sales ke server backend berdasarkan userId
    * @param {String} userId - ID unik dari PostgreSQL database
    */
@@ -42,5 +28,30 @@ export const userService = {
       console.error("🚨 Error deleting sales:", error);
       throw error.response?.data?.message || '❌ Gagal menghapus agen sales.';
     }
-  }
+  },
+
+  getTenantSalesList: async (includeInactive = false) => {
+    try {
+      const response = await axiosInstance.get(
+        `/api/users/sales/list${includeInactive ? '?includeInactive=true' : ''}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("🚨 Gagal memuat daftar tim sales:", error);
+      throw error.response?.data?.message || '❌ Gagal memuat daftar tim sales.';
+    }
+  },
+
+  toggleSalesStatus: async (userId) => {
+    try {
+      const response = await axiosInstance.patch(
+        `/api/users/sales/${userId}/toggle-status`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("🚨 Gagal mengubah status sales:", error);
+      throw error.response?.data?.message || '❌ Gagal mengubah status agen sales.';
+    }
+  },
+
 };

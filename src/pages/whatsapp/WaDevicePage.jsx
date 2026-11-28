@@ -8,6 +8,10 @@ import LegalModal from './components/LegalModal';
 import WaConnectionStatus from '../chatbot/components/WaConnectionStatus';
 // import WaConnectionStatus from './components/WaConnectionStatus';
 
+import ExpiredSubscriptionCard from "./components/ExpiredSubscriptionCard";
+import BillingModal from '../../components/BillingModal';
+
+
 // const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const SOCKET_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
@@ -34,6 +38,9 @@ export default function WaDevicePage() {
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false);
 
+  const [expiredMessage, setExpiredMessage] = useState("");
+  
+
   const [qrData, setQrData] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState(null);
@@ -45,6 +52,8 @@ export default function WaDevicePage() {
 
   const user = getStoredUser();
   const tenantId = user?.tenantId;
+
+  const [isBillingOpen, setIsBillingOpen] = useState(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -230,8 +239,7 @@ export default function WaDevicePage() {
     return () => clearInterval(fastInterval);
   }, [isOpenModal]);
 
-  // 5. Buka Modal & Minta QR Code baru dari server
-  const handleFetchQr = useCallback(
+    const handleFetchQr = useCallback(
     async (isRetry = false) => {
       if (!agreedDisclaimer) {
         alert(
@@ -250,6 +258,7 @@ export default function WaDevicePage() {
       try {
         setQrLoading(true);
         setQrError(null);
+        setExpiredMessage(''); // Reset pesan expired sebelumnya
         setIsOpenModal(true);
 
         const res = await chatbotService.getQrCodeBot();
@@ -298,12 +307,103 @@ export default function WaDevicePage() {
         setQrLoading(false);
       } catch (err) {
         if (!isMountedRef.current) return;
-        setQrError(err?.message || 'Terjadi kesalahan sistem.');
+        const serverError =
+          typeof err === 'string'
+            ? err
+            : err?.response?.data?.message ||
+              err?.message ||
+              'Terjadi kesalahan sistem.';
+
+        setQrError(serverError);
+        setExpiredMessage(serverError); // Simpan pesan untuk ExpiredSubscriptionCard
+        setIsOpenModal(false); // Tutup modal QR agar Card Peringatan langsung terlihat
         setQrLoading(false);
       }
     },
     [agreedDisclaimer, phoneNumber]
   );
+
+  // 5. Buka Modal & Minta QR Code baru dari server
+  // const handleFetchQr = useCallback(
+  //   async (isRetry = false) => {
+  //     if (!agreedDisclaimer) {
+  //       alert(
+  //         'Silakan centang persetujuan Panduan Keamanan & Ketentuan Penggunaan WhatsApp terlebih dahulu.'
+  //       );
+  //       return;
+  //     }
+
+  //     if (!isRetry) {
+  //       initRetryCountRef.current = 0;
+  //       if (initTimerRef.current) {
+  //         clearTimeout(initTimerRef.current);
+  //       }
+  //     }
+
+  //     try {
+  //       setQrLoading(true);
+  //       setQrError(null);
+  //       setIsOpenModal(true);
+
+  //       const res = await chatbotService.getQrCodeBot();
+  //       const data = res?.data ? res.data : res;
+
+  //       if (!isMountedRef.current) return;
+
+  //       if (data?.success && data.status === 'ONLINE') {
+  //         initRetryCountRef.current = 0;
+  //         setWaStatus('ONLINE');
+  //         setPhoneNumber(data.phoneNumber || data.botNumber || phoneNumber);
+  //         setIsOpenModal(false);
+  //         setQrData(null);
+  //         setCountdown(0);
+  //         setQrLoading(false);
+  //         return;
+  //       }
+
+  //       if (data?.success && data.status === 'OFFLINE_INITIALIZING') {
+  //         if (initRetryCountRef.current < MAX_INIT_RETRIES) {
+  //           initRetryCountRef.current += 1;
+  //           initTimerRef.current = setTimeout(() => {
+  //             handleFetchQr(true);
+  //           }, 2500);
+  //           return;
+  //         }
+  //         setQrError(
+  //           'Perangkat sedang diinisialisasi terlalu lama. Silakan klik refresh beberapa saat lagi.'
+  //         );
+  //         setQrLoading(false);
+  //         return;
+  //       }
+
+  //       const qrString = data?.qrCodeString || data?.qr || data?.qrCode;
+  //       if (data?.success && qrString) {
+  //         initRetryCountRef.current = 0;
+  //         setQrData({
+  //           ...data,
+  //           qrCodeString: qrString,
+  //         });
+  //         setCountdown(data.validDurationSeconds || 60);
+  //         setWaStatus('WAITING_SCAN');
+  //       } else {
+  //         setQrError(data?.message || 'Gagal mendapatkan QR Code.');
+  //       }
+  //       setQrLoading(false);
+  //     } catch (err) {
+  //       if (!isMountedRef.current) return;
+  //       const serverError =
+  //         typeof err === 'string'
+  //           ? err
+  //           : err?.response?.data?.message ||
+  //             err?.message ||
+  //             'Terjadi kesalahan sistem.';
+
+  //       setQrError(serverError);
+  //       setQrLoading(false);
+  //     }
+  //   },
+  //   [agreedDisclaimer, phoneNumber]
+  // );
 
   const handleCloseModal = () => {
     if (initTimerRef.current) {
@@ -349,44 +449,7 @@ export default function WaDevicePage() {
       setDisconnectLoading(false);
     }
   };
-
-
-  // 6. Putuskan sesi perangkat WhatsApp
-  // const handleDisconnect = async () => {
-  //   if (
-  //     !window.confirm(
-  //       'Apakah Anda yakin ingin memutuskan koneksi bot WhatsApp ini?'
-  //     )
-  //   ) {
-  //     return;
-  //   }
-
-  //   if (!tenantId) {
-  //     alert('Tenant ID tidak ditemukan.');
-  //     return;
-  //   }
-
-  //   try {
-  //     setDisconnectLoading(true);
-  //     const res = await chatbotService.disConectedBot(tenantId);
-  //     const data = res?.data ? res.data : res;
-
-  //     if (data?.success) {
-  //       setWaStatus('OFFLINE');
-  //       setPhoneNumber('');
-  //       setQrData(null);
-  //       setCountdown(0);
-  //       alert('Bot berhasil diputus koneksinya.');
-  //     } else {
-  //       alert(data?.message || 'Gagal memutuskan koneksi bot.');
-  //     }
-  //   } catch (err) {
-  //     alert(err?.message || 'Terjadi kesalahan.');
-  //   } finally {
-  //     setDisconnectLoading(false);
-  //   }
-  // };
-
+  
   const isOnline = waStatus === 'ONLINE';
 
     return (
@@ -591,7 +654,6 @@ export default function WaDevicePage() {
           </div>
         )}
 
-
         {/* MODAL QR CODE */}
         <WaQrModal
           isOpen={isOpenModal}
@@ -602,7 +664,16 @@ export default function WaDevicePage() {
           onClose={handleCloseModal}
           onRefresh={() => handleFetchQr(false)}
         />
+
+        {expiredMessage && (
+          <ExpiredSubscriptionCard
+            message={expiredMessage}
+            onOpenBilling={() => setIsBillingOpen(true)}
+          />
+        )}
+
       </div>
+      <BillingModal isOpen={isBillingOpen} onClose={() => setIsBillingOpen(false)} tenant={user} />
     </div>
   );
 

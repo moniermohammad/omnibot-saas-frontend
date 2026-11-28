@@ -1,14 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '../../components/Sidebar';
 import BillingModal from '../../components/BillingModal';
 import DashboardHeader from './components/DashboardHeader';
-import WaStatusCard from '../chatbot/components/WaStatusCard'; // ✅ Panggil kembali WaStatusCard asli
 import KpiStatsGrid from './components/KpiStatsGrid';
 import RecentLeadsCard from './components/RecentLeadsCard';
 import SalesLeaderboardCard from './components/SalesLeaderboardCard';
 import { dashboardService } from '../../api/dashboardService';
-import { chatbotService } from '../../api/chatbotService'; // ✅ Untuk aksi disconnect jika ada
 
 export default function DashboardOverview() {
   const navigate = useNavigate();
@@ -90,20 +87,6 @@ export default function DashboardOverview() {
     return () => clearInterval(interval);
   }, [fetchDashboardData]);
 
-  // ✅ Handler tombol "Putuskan Sesi Bot"
-  const handleDisconnect = async () => {
-    if (!window.confirm('Yakin ingin memutuskan koneksi perangkat WhatsApp bot ini?')) return;
-    try {
-      setDisconnectLoading(true);
-      await chatbotService.disconnectWa(user.tenantId); // Sesuaikan nama method service kamu
-      await fetchDashboardData();
-    } catch (err) {
-      alert('Gagal memutuskan sesi perangkat: ' + err);
-    } finally {
-      setDisconnectLoading(false);
-    }
-  };
-
   return (
     <div className="flex bg-[#030712] min-h-screen text-[#f8fafc] font-sans antialiased box-border relative overflow-hidden">
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[130px] pointer-events-none" />
@@ -141,18 +124,6 @@ export default function DashboardOverview() {
               </button>
             </div>
           )}
-
-          {/* ✅ KOMPONEN ASLI WaStatusCard KEMBALI TERPASANG LENGKAP */}
-          {/* <WaStatusCard
-            status={waStatus}
-            phoneNumber={botMetrics.phoneNumber}
-            loading={botMetrics.loading}
-            disconnectLoading={disconnectLoading}
-            onCheck={fetchDashboardData}
-            onFetchQr={() => navigate('/dashboard/wa-device')}
-            onDisconnect={handleDisconnect}
-          /> */}
-
           {/* Letakkan tepat di bawah <WaStatusCard ... /> di DashboardOverview.jsx */}
            {!botMetrics.loading && botMetrics.totalActive === 0 && (
              <div className="p-4 bg-sky-500/10 border border-sky-500/25 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
@@ -174,7 +145,6 @@ export default function DashboardOverview() {
                </button>
              </div>
            )}
-
 
           <KpiStatsGrid metrics={botMetrics} saasStatus={saasInfo.status} />
 

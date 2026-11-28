@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axiosInstance from '../../api/axiosInstance';
+import { userService } from '../../api/userService';
+import ManageSalesModal from '../chatbot/components/ManageSalesModal'; // sesuaikan path-nya
 
 function getStoredUser() {
   try {
@@ -27,6 +29,22 @@ export default function SettingsPage() {
     recoveryEmail: '',
     address: '',
   });
+
+  const handleToggleSales = async (targetUser) => {
+    try {
+      setTogglingUserId(targetUser.userId || targetUser.id);
+      const res = await userService.toggleSalesStatus(targetUser.userId || targetUser.id);
+      if (res?.success) {
+        // Panggil ulang fungsi pemuat data halaman Setting Anda di sini
+        await fetchSettingsData();
+      }
+    } catch (err) {
+      alert(typeof err === 'string' ? err : err?.message || 'Gagal mengubah status sales.');
+    } finally {
+      setTogglingUserId(null);
+    }
+  };
+
 
   const isMountedRef = useRef(true);
 
@@ -144,51 +162,6 @@ export default function SettingsPage() {
   }
 };
 
-
-
-  // const handleSaveProfile = async (e) => {
-  //   e.preventDefault();
-  //   const payload = {
-  //     businessName: formData.businessName.trim(),
-  //     businessType: formData.businessType.trim(),
-  //     ownerName: formData.ownerName.trim(),
-  //     recoveryEmail: formData.recoveryEmail.trim(),
-  //     address: formData.address.trim(),
-  //   };
-
-  //   try {
-  //     setSaving(true);
-  //     const res = await axiosInstance.put('/api/tenant/update', payload);
-
-  //     if (res.data?.success) {
-  //       const savedUser = getStoredUser();
-  //       localStorage.setItem(
-  //         'saas_user',
-  //         JSON.stringify({
-  //           ...savedUser,
-  //           name: payload.ownerName,
-  //           businessName: payload.businessName,
-  //         })
-  //       );
-
-  //       alert(res.data.message || 'Profil bisnis berhasil diperbarui.');
-  //       setIsEditing(false);
-  //       await fetchTenantSettings();
-  //     } else {
-  //       alert(res.data?.message || 'Gagal menyimpan perubahan.');
-  //     }
-  //   } catch (err) {
-  //     alert(
-  //       err.response?.data?.message ||
-  //         'Terjadi kesalahan saat menyimpan profil.'
-  //     );
-  //   } finally {
-  //     if (isMountedRef.current) {
-  //       setSaving(false);
-  //     }
-  //   }
-  // };
-
   const handleCancelEdit = () => {
     setFormData({
       businessName: tenantData?.businessName || '',
@@ -232,9 +205,59 @@ export default function SettingsPage() {
       }
   };
 
+    const [togglingUserId, setTogglingUserId] = useState(null);
+  const [isManageSalesOpen, setIsManageSalesOpen] = useState(false);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState(null);
+
+  const handleToggleSalesStatus = async (u) => {
+    const targetId = u.userId || u.id || u._id;
+    if (!targetId) return;
+
+    try {
+      setTogglingUserId(targetId);
+      const res = await userService.toggleSalesStatus(targetId);
+      if (res?.success) {
+        window.location.reload();
+      }
+    } catch (err) {
+      setToast({
+        type: 'error',
+        message: typeof err === 'string' ? err : err?.message || 'Gagal mengubah status sales.',
+      });
+    } finally {
+      setTogglingUserId(null);
+    }
+  };
+
+  // Dipanggil saat tombol "Ya, Hapus Agen" di modal custom diklik
+  const executeDeleteSalesUser = async () => {
+    if (!confirmDeleteUser) return;
+    const targetId = confirmDeleteUser.userId || confirmDeleteUser.id || confirmDeleteUser._id;
+
+    try {
+      setTogglingUserId(targetId);
+      const res = await userService.deleteSales(targetId);
+      if (res?.success) {
+        setConfirmDeleteUser(null);
+        window.location.reload();
+      }
+    } catch (err) {
+      setConfirmDeleteUser(null);
+      setToast({
+        type: 'error',
+        message: typeof err === 'string' ? err : err?.message || 'Gagal menghapus sales.',
+      });
+    } finally {
+      setTogglingUserId(null);
+    }
+  };
 
   const usersList = Array.isArray(tenantData?.users) ? tenantData.users : [];
+  const activeSalesCount = usersList.filter(
+    (item) => item.role?.toUpperCase() === 'SALES' && item.isActive
+  ).length;
 
+ 
   return (
     <div className="flex-1 p-6 md:p-8 lg:p-10 max-w-5xl mx-auto w-full text-left text-[#f8fafc] pb-24 lg:pb-10">
 
@@ -469,7 +492,201 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* KARTU 2: DAFTAR USER DI DALAM TENANT */}
+                     {/* KARTU 2: DAFTAR USER DI DALAM TENANT */}
+          <div className="bg-[#0f172a]/80 border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <h3 className="text-base font-bold text-white m-0">
+                👥 Daftar Pengguna Terdaftar ({usersList.length})
+              </h3>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-300 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+                  Kuota Sales: <strong>{tenantData?.maxSales ?? '-'}</strong>
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setIsManageSalesOpen(true)}
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer shadow-sm"
+                >
+                  + Tambah / Kelola Sales
+                </button>
+              </div>
+            </div>
+
+            {/* Banner Peringatan Jika Kuota Penuh / Error */}
+            {/* {actionFeedback && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+                <span>⚠️ {actionFeedback.message}</span>
+                <button
+                  type="button"
+                  onClick={() => setActionFeedback(null)}
+                  className="text-amber-400 hover:text-white font-bold ml-3 cursor-pointer bg-transparent border-0"
+                >
+                  ✕
+                </button>
+              </div>
+            )} */}
+
+            {usersList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                Tidak ada data pengguna.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 text-slate-400">
+                      <th className="py-2.5 px-3 font-semibold">Nama</th>
+                      <th className="py-2.5 px-3 font-semibold">Nomor WhatsApp</th>
+                      <th className="py-2.5 px-3 font-semibold">Role</th>
+                      <th className="py-2.5 px-3 font-semibold">Status</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {usersList.map((u, idx) => {
+                      const uId = u.userId || u.id || u._id;
+                      const isSales = u.role?.toUpperCase() === 'SALES';
+                      const isMaxReached = !u.isActive && activeSalesCount >= (tenantData?.maxSales ?? 1);
+                    
+                      return (
+                        <tr
+                          key={uId || u.phoneNumber || idx}
+                          className={`hover:bg-white/[0.02] ${!u.isActive ? 'opacity-70' : ''}`}
+                        >
+                          <td className="py-3 px-3 font-semibold text-white">
+                            {u.name || '-'}
+                          </td>
+                          <td className="py-3 px-3 text-slate-300 font-mono">
+                            +{u.phoneNumber || '-'}
+                          </td>
+                          <td className="py-3 px-3 text-sky-300">
+                            {u.role || 'USER'}
+                          </td>
+                          <td className="py-3 px-3">
+                            {u.isActive ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                Aktif
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-500/15 text-slate-400 border border-white/10">
+                                Nonaktif
+                              </span>
+                            )}
+                          </td>
+                          
+                          <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
+                            {isSales ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={togglingUserId === uId || isMaxReached}
+                                  title={
+                                    isMaxReached
+                                      ? 'Kuota sales aktif penuh. Nonaktifkan salah satu sales terlebih dahulu.'
+                                      : ''
+                                  }
+                                  onClick={() => handleToggleSalesStatus(u)}
+                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                                    isMaxReached
+                                      ? 'bg-white/5 text-slate-500 border-white/10 cursor-not-allowed opacity-50'
+                                      : u.isActive
+                                        ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/25 cursor-pointer'
+                                        : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30 cursor-pointer'
+                                  }`}
+                                >
+                                  {togglingUserId === uId
+                                    ? '⏳...'
+                                    : u.isActive
+                                      ? '⏸ Nonaktifkan'
+                                      : '▶️ Aktifkan'}
+                                </button>
+                                  
+                                <button
+                                  type="button"
+                                  disabled={togglingUserId === uId}
+                                  onClick={() => setConfirmDeleteUser(u)}
+                                  className="px-2.5 py-1 bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/20 hover:border-red-600 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+                                >
+                                  🗑️ Hapus
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-slate-500 italic">
+                                Akun Utama
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+          </div>
+
+          {/* Modal Tambah / Kelola Sales */}
+          <ManageSalesModal
+            isOpen={isManageSalesOpen}
+            onClose={() => setIsManageSalesOpen(false)}
+            onRefreshList={() => window.location.reload()}
+          />
+
+          {/* Modal Konfirmasi Hapus Agen Custom */}
+          {confirmDeleteUser && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+              onClick={() => setConfirmDeleteUser(null)}
+            >
+              <div
+                className="bg-[#0f172a] border border-white/15 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-left"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-lg shrink-0">
+                    🗑️
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white m-0">
+                      Hapus Agen Sales?
+                    </h3>
+                    <p className="text-xs text-slate-400 m-0 mt-0.5">
+                      Tindakan ini tidak dapat dibatalkan.
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed m-0 bg-white/[0.03] p-3 rounded-xl border border-white/5">
+                  Apakah Anda yakin ingin menghapus <strong className="text-white">{confirmDeleteUser.name}</strong> (+{confirmDeleteUser.phoneNumber}) dari daftar tim sales?
+                </p>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteUser(null)}
+                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(togglingUserId)}
+                    onClick={executeDeleteSalesUser}
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors cursor-pointer shadow-lg shadow-rose-600/25 disabled:opacity-50"
+                  >
+                    {togglingUserId ? '⏳ Menghapus...' : 'Ya, Hapus Agen'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+
+          {/* KARTU 2: DAFTAR USER DI DALAM TENANT
           <div className="bg-[#0f172a]/80 border border-white/10 rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
               <h3 className="text-base font-bold text-white m-0">
@@ -527,10 +744,10 @@ export default function SettingsPage() {
                 </table>
               </div>
             )}
-          </div>
+          </div> */}
 
-                 {/* KARTU 3: ZONA BERBAHAYA - HAPUS PERMANEN SEMUA DATA TENANT */}
-       {currentUser?.role?.toUpperCase() === 'OWNER' && (
+        {/* KARTU 3: ZONA BERBAHAYA - HAPUS PERMANEN SEMUA DATA TENANT */}
+        {currentUser?.role?.toUpperCase() === 'OWNER' && (
          <div className="mt-6 bg-red-950/20 border border-red-500/30 rounded-2xl p-6 shadow-xl">
            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
              <div>
@@ -607,166 +824,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-// import React, { useState, useEffect } from 'react';
-// import axiosInstance from '../../api/axiosInstance';
-
-// export default function SettingsPage() {
-//   const [loading, setLoading] = useState(true);
-//   const [error, setError] = useState('');
-//   const [tenantData, setTenantData] = useState(null);
-//   const [currentUser, setCurrentUser] = useState(null);
-
-//   useEffect(() => {
-//     const fetchTenantSettings = async () => {
-//       try {
-//         setLoading(true);
-//         setError('');
-//         const res = await axiosInstance.get('/api/tenant/get');
-//         if (res.data?.success) {
-//           setTenantData(res.data.data?.tenant || null);
-//           setCurrentUser(res.data.data?.user || null);
-//         } else {
-//           setError(res.data?.message || 'Gagal memuat data tenant.');
-//         }
-//       } catch (err) {
-//         setError(err.response?.data?.message || 'Terjadi kesalahan saat mengambil data pengaturan.');
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     fetchTenantSettings();
-//   }, []);
-
-//   const usersList = tenantData?.users || [];
-
-//   return (
-//     <div className="flex-1 p-6 md:p-8 lg:p-10 max-w-5xl mx-auto w-full text-left text-[#f8fafc] pb-24 lg:pb-10">
-//       {/* Header Halaman */}
-//       <div className="mb-6">
-//         <h2 className="text-2xl font-extrabold text-white m-0">🏢 Setting Bisnis &amp; Anggota</h2>
-//         <p className="text-xs text-slate-400 m-0 mt-1">
-//           Informasi profil workspace bisnis, email pemulihan, dan daftar pengguna terdaftar.
-//         </p>
-//       </div>
-
-//       {loading ? (
-//         <div className="py-20 text-center text-slate-400 text-sm animate-pulse">
-//           ⏳ Memuat data pengaturan bisnis...
-//         </div>
-//       ) : error ? (
-//         <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 text-sm">
-//           ⚠️ {error}
-//         </div>
-//       ) : (
-//         <>
-//           {/* KARTU 1: INFORMASI TENANT */}
-//           <div className="bg-[#0f172a]/80 border border-white/10 rounded-2xl p-6 mb-6 shadow-xl space-y-4">
-//             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-//               <h3 className="text-base font-bold text-white m-0">📋 Profil Workspace Tenant</h3>
-//               <span className="text-[11px] text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg font-mono">
-//                 ID: {tenantData?.tenantId}
-//               </span>
-//             </div>
-
-//             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-//               <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5">
-//                 <span className="text-slate-400 block mb-1">Nama Bisnis / Workspace</span>
-//                 <span className="text-sm font-bold text-white">
-//                   {tenantData?.businessName || '-'}
-//                 </span>
-//               </div>
-
-//               <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5">
-//                 <span className="text-slate-400 block mb-1">Tipe Bisnis &amp; Paket</span>
-//                 <span className="text-sm font-bold text-sky-400">
-//                   {tenantData?.businessType || 'UMUM'} • {tenantData?.tenantType} ({tenantData?.status})
-//                 </span>
-//               </div>
-
-//               <div className="p-3.5 rounded-xl bg-slate-900/90 border border-white/5">
-//                 <span className="text-slate-400 block mb-1">Pemilik (Owner) Saat Ini</span>
-//                 <span className="text-sm font-bold text-white">
-//                   {currentUser?.name || '-'} (+{currentUser?.phoneNumber || '-'})
-//                 </span>
-//               </div>
-
-//               <div className="p-3.5 rounded-xl bg-slate-900/90 border border-emerald-500/20">
-//                 <span className="text-emerald-300 block mb-1">🛡️ Email Pemulihan Akun</span>
-//                 <span className="text-sm font-bold text-white">
-//                   {tenantData?.recoveryEmail || (
-//                     <span className="text-amber-400 italic font-normal">Belum diatur</span>
-//                   )}
-//                 </span>
-//               </div>
-
-//               <div className="sm:col-span-2 p-3.5 rounded-xl bg-slate-900/90 border border-white/5">
-//                 <span className="text-slate-400 block mb-1">Alamat Bisnis</span>
-//                 <span className="text-sm text-slate-200">{tenantData?.address || '-'}</span>
-//               </div>
-//             </div>
-//           </div>
-
-//           {/* KARTU 2: DAFTAR USER DI DALAM TENANT */}
-//           <div className="bg-[#0f172a]/80 border border-white/10 rounded-2xl p-6 shadow-xl">
-//             <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-//               <h3 className="text-base font-bold text-white m-0">
-//                 👥 Daftar Pengguna Terdaftar ({usersList.length})
-//               </h3>
-//               <span className="text-xs text-slate-400">
-//                 Kuota Sales: <strong className="text-white">{tenantData?.maxSales}</strong>
-//               </span>
-//             </div>
-
-//             <div className="overflow-x-auto border border-white/5 rounded-xl bg-black/20">
-//               <table className="w-full border-collapse text-xs">
-//                 <thead>
-//                   <tr className="border-b border-white/10 bg-white/[0.02] text-slate-400 uppercase text-[10px] tracking-wider">
-//                     <th className="py-3 px-4 text-left">Nama</th>
-//                     <th className="py-3 px-4 text-left">Nomor WhatsApp</th>
-//                     <th className="py-3 px-4 text-left">Role</th>
-//                     <th className="py-3 px-4 text-center">Status</th>
-//                   </tr>
-//                 </thead>
-//                 <tbody className="divide-y divide-white/5 text-slate-200">
-//                   {usersList.length === 0 ? (
-//                     <tr>
-//                       <td colSpan="4" className="py-6 text-center text-slate-500 italic">
-//                         Tidak ada data pengguna.
-//                       </td>
-//                     </tr>
-//                   ) : (
-//                     usersList.map((u) => (
-//                       <tr key={u.userId} className="hover:bg-white/[0.02]">
-//                         <td className="py-3 px-4 font-semibold text-white">{u.name}</td>
-//                         <td className="py-3 px-4 font-mono text-slate-300">+{u.phoneNumber}</td>
-//                         <td className="py-3 px-4">
-//                           <span
-//                             className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-//                               u.role === 'OWNER'
-//                                 ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-//                                 : 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
-//                             }`}
-//                           >
-//                             {u.role}
-//                           </span>
-//                         </td>
-//                         <td className="py-3 px-4 text-center">
-//                           {u.isActive ? (
-//                             <span className="text-emerald-400 font-semibold text-[11px]">● Aktif</span>
-//                           ) : (
-//                             <span className="text-red-400 font-semibold text-[11px]">● Nonaktif</span>
-//                           )}
-//                         </td>
-//                       </tr>
-//                     ))
-//                   )}
-//                 </tbody>
-//               </table>
-//             </div>
-//           </div>
-//         </>
-//       )}
-//     </div>
-//   );
-// }

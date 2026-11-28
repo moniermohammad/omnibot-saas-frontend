@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// import Sidebar from '../../components/Sidebar';
-// import axiosInstance from '../../api/axiosInstance';
 import { userService } from '../../api/userService';
 import { leadService } from '../../api/leadService';
 
@@ -27,26 +25,28 @@ export default function CrmLeadsPage() {
   } catch {
     user = null;
   }
+
   const userRole = user?.role?.toUpperCase() || 'SALES';
 
     const fetchAllLeadsData = useCallback(async () => {
-      try {
-        setLoading(true);
-        const leadsRes = await leadService.getAllLeads();
-        if (leadsRes?.success) {
-          setLeads(leadsRes.data || []);
-        }
-    
-        const salesRes = await userService.getTenantSalesList();
-        if (salesRes?.success) {
-          setSalesList(salesRes.data || []);
-        }
-      } catch (err) {
-        console.error('Gagal memuat data CRM Leads:', err);
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      const leadsRes = await leadService.getAllLeads();
+      if (leadsRes?.success) {
+        setLeads(leadsRes.data || []);
       }
+
+      const salesRes = await userService.getTenantSalesList(true); // ✅ Ubah di dalam sini
+      if (salesRes?.success) {
+        setSalesList(salesRes.data || []);
+      }
+    } catch (err) {
+      console.error('Gagal memuat data CRM Leads:', err);
+    } finally {
+      setLoading(false);
+    }
     }, []);
+
 
   useEffect(() => {
     fetchAllLeadsData();
@@ -81,28 +81,30 @@ export default function CrmLeadsPage() {
 
   // Filter data leads
   const filteredLeads = leads.filter((lead) => {
-    if (userRole === 'SALES' && lead.assignedToSalesId && lead.assignedToSalesId !== user?.userId) {
-      return false;
-    }
+  if (userRole === 'SALES' && lead.assignedToSalesId && lead.assignedToSalesId !== user?.userId) {
+    return false;
+  }
 
-    const matchSales =
-      selectedSales === 'ALL' ||
-      (selectedSales === 'UNASSIGNED' && !lead.assignedToSalesId) ||
-      lead.assignedToSalesId === selectedSales;
+  const picName = (lead.sales?.name || lead.assignedSalesName || '').trim();
 
-    const matchStatus = selectedStatus === 'ALL' || lead.status === selectedStatus;
+  const matchSales =
+    selectedSales === 'ALL' ||
+    (selectedSales === 'UNASSIGNED' && !picName) ||
+    picName === selectedSales;
 
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return matchSales && matchStatus;
+  const matchStatus = selectedStatus === 'ALL' || lead.status === selectedStatus;
 
-    const customerName = getCustomerName(lead.formData).toLowerCase();
-    const formValues = JSON.stringify(lead.formData || {}).toLowerCase();
-    const matchSearch =
-      customerName.includes(q) ||
-      String(lead.phoneNumber || '').toLowerCase().includes(q) ||
-      formValues.includes(q);
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) return matchSales && matchStatus;
 
-    return matchSales && matchStatus && matchSearch;
+  const customerName = getCustomerName(lead.formData).toLowerCase();
+  const formValues = JSON.stringify(lead.formData || {}).toLowerCase();
+  const matchSearch =
+    customerName.includes(q) ||
+    String(lead.phoneNumber || '').toLowerCase().includes(q) ||
+    formValues.includes(q);
+
+  return matchSales && matchStatus && matchSearch;
   });
 
   // ✅ FITUR EXPORT KE CSV / EXCEL
@@ -148,6 +150,17 @@ export default function CrmLeadsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const uniqueSalesNames = Array.from(
+    new Set(
+      leads
+        .map((l) => (l.sales?.name || l.assignedSalesName || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  
+
+
   return (
     <div className="flex bg-[#030712] min-h-screen text-[#f8fafc] font-sans antialiased">
       {/* <Sidebar /> */}
@@ -182,9 +195,9 @@ export default function CrmLeadsPage() {
           </div>
         </div>
 
-        {/* Bar Filter & Pencarian */}
+                {/* Bar Filter & Pencarian */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6 bg-[#0f172a]/70 p-4 rounded-2xl border border-white/5">
-          <div className="sm:col-span-2">
+          <div className={userRole !== 'SALES' ? 'sm:col-span-2' : 'sm:col-span-3'}>
             <input
               type="text"
               placeholder="🔍 Cari nama pelanggan, nomor WA, atau kebutuhan..."
@@ -198,29 +211,19 @@ export default function CrmLeadsPage() {
             <select
               value={selectedSales}
               onChange={(e) => setSelectedSales(e.target.value)}
-              className="h-10 px-3 rounded-xl bg-black/40 border border-white/10 text-xs text-white outline-none focus:border-sky-500"
+              className="h-10 px-3 rounded-xl bg-black/40 border border-white/10 text-xs text-white outline-none focus:border-sky-500 cursor-pointer"
             >
-              <option value="ALL">👤 Semua PIC Sales</option>
+              <option value="ALL">👥 Semua PIC Sales</option>
               <option value="UNASSIGNED">⏳ Belum Ada Sales</option>
-              {salesList.map((s) => (
-                <option key={s.userId} value={s.userId}>
-                  Sales: {s.name}
+              {uniqueSalesNames.map((name) => (
+                <option key={name} value={name}>
+                  Sales: {name}
                 </option>
               ))}
             </select>
           )}
-
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="h-10 px-3 rounded-xl bg-black/40 border border-white/10 text-xs text-white outline-none focus:border-sky-500"
-          >
-            <option value="ALL">📌 Semua Status</option>
-            <option value="ASSIGNED">✅ ASSIGNED (Diteruskan)</option>
-            <option value="BOT_PROCESS">💬 BOT_PROCESS (Sedang Chat)</option>
-            <option value="CANCELLED">❌ CANCELLED (Dibatalkan)</option>
-          </select>
         </div>
+
 
         {/* Tabel Daftar Prospek */}
         <div className="bg-[#0f172a]/70 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
