@@ -214,8 +214,23 @@ export default function TenantMonitorTab({
                           : "bg-sky-500/15 text-sky-300"
                       }`}
                     >
-                      {t.subscriptionStatus}
+                      {t.subscriptionStatus === "SUSPENDED"
+                        ? "NONAKTIF"
+                        : t.subscriptionStatus === "EXPIRED"
+                          ? "EXPIRED"
+                          : t.subscriptionStatus}
                     </span>
+
+                    {/* <span
+                      className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                        t.subscriptionStatus === "SUSPENDED" ||
+                        t.subscriptionStatus === "EXPIRED"
+                          ? "bg-rose-500/20 text-rose-400"
+                          : "bg-sky-500/15 text-sky-300"
+                      }`}
+                    >
+                      {t.subscriptionStatus}
+                    </span> */}
                     <span className="ml-1.5 text-slate-300">
                       {t.daysLeft > 0 ? `${t.daysLeft} hari lagi` : "Habis"}
                     </span>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../../src/api/authService';
+import { useToast } from '../../components/ToastProvider';
 
 export default function Login() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -10,6 +11,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   // 1. TAHAP 1: Request OTP menggunakan Service
   const handleRequestOtp = async (e) => {
@@ -42,15 +44,25 @@ export default function Login() {
       if (data.success && data.token) {
         localStorage.setItem('saas_token', data.token);
         localStorage.setItem('saas_user', JSON.stringify(data.user));
-        alert(`🎉 Selamat datang kembali, ${data.user.name}!`);
-        navigate('/dashboard');
+
+        // ✅ Tampilkan toast cantik yang tetap muncul walau langsung pindah halaman
+        showToast(`🎉 Selamat datang kembali, ${data.user.name}!`, 'success');
+
+        if (data.user?.role?.toUpperCase() === 'SALES') {
+          navigate('/dashboard/crm', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
       }
     } catch (errMessage) {
       setError(errMessage);
+      showToast(typeof errMessage === 'string' ? errMessage : 'Verifikasi token gagal.', 'error');
     } finally {
       setLoading(false);
     }
   };
+
+
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-[#0b0f19] text-gray-100 font-sans p-5 bg-[radial-gradient(circle_at_bottom_left,rgba(37,99,235,0.1),transparent_400px)] box-border">
