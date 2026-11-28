@@ -155,6 +155,7 @@ export default function BillingModal({ isOpen, onClose, tenant, currentSalesCoun
       setSubmitting(false);
     }
   };
+
   return (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
     <div className="bg-[#0f172a] border border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl text-left space-y-4 my-auto">
@@ -367,6 +368,39 @@ export default function BillingModal({ isOpen, onClose, tenant, currentSalesCoun
           </button>
         </>
       )}
+
+            {/* MODAL POPUP PERBESAR QRIS */}
+      {zoomQris && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setZoomQris(false);
+          }}
+          className="fixed inset-0 z- flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-white p-5 rounded-2xl shadow-2xl max-w-sm w-full text-center"
+          >
+            <button
+              type="button"
+              onClick={() => setZoomQris(false)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg cursor-pointer flex items-center justify-center border-0"
+            >
+              ✕
+            </button>
+            <img
+              src={activeQrisSrc}
+              alt="QRIS OmniBot Engine Diperbesar"
+              className="w-full h-auto object-contain rounded-xl"
+            />
+            <p className="text-xs font-bold text-slate-800 mt-3 mb-0">
+              Scan QRIS ({formattedPrice})
+            </p>
+          </div>
+        </div>
+      )}
+
     </div>
   </div>
 );
