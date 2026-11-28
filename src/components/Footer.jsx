@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import LegalModal from '../pages/whatsapp/components/LegalModal'; // Sesuaikan path relatif ke LegalModal.jsx
+import LegalModal from '../pages/whatsapp/components/LegalModal';
 
 export default function Footer() {
   const [activeLegalDoc, setActiveLegalDoc] = useState(null); // 'TERMS' | 'PRIVACY' | null
   const currentYear = new Date().getFullYear();
+const adminWa = '628558836680';
+const defaultMessage = encodeURIComponent(
+  'Halo Admin OmniBot Engine, saya butuh bantuan teknis terkait aplikasi.'
+);
 
-  // Gunakan wa.me agar langsung membuka ruang chat WhatsApp
-  const waHelpUrl = `https://wa.me{encodeURIComponent(
-    'Halo Admin OmniBot Engine, saya butuh bantuan teknis terkait aplikasi.'
-  )}`;
+// const waHelpUrl = 'https://wa.me/' + adminWa + '?text=' + defaultMessage;
+const waHelpUrl = `https://wa.me/${adminWa}?text=${defaultMessage}`;
+
 
   return (
     <>
-      <footer className="w-full border-t border-white/5 bg-[#0f172a]/30 px-6 md:px-8 lg:px-10 py-4 pb-20 lg:pb-4 text-xs text-slate-400">
+      <footer className="w-full border-t border-white/5 bg-[#090d16] px-6 md:px-8 lg:px-10 py-5 text-xs text-slate-400">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           {/* Kiri: Brand & Copyright */}
           <div className="flex items-center gap-2 text-center sm:text-left">
@@ -60,7 +63,7 @@ export default function Footer() {
         </div>
       </footer>
 
-      {/* Modal Dokumen Legal (Bisa dibaca kapan saja dari Footer) */}
+      {/* Modal Dokumen Legal */}
       <LegalModal
         activeDoc={activeLegalDoc}
         onClose={() => setActiveLegalDoc(null)}
@@ -69,6 +72,7 @@ export default function Footer() {
     </>
   );
 }
+
 
 
 // import React from 'react';
